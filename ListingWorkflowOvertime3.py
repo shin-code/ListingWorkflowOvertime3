@@ -3,17 +3,21 @@ from selenium import webdriver
 from selenium.webdriver.support.select import Select
 from bs4 import BeautifulSoup
 
+# id, pw問い合わせ
+dnId = input("ログインID >> ")
+dnPw = input("パスワード >> ")
+
 # chromeからdesknet'sを開く
 driver = webdriver.Chrome("./chromedriver")
 driver.get("https://dkn.e-omc.jp/cgi-bin/dneo/dneo.cgi?")
 
 # id
 id = driver.find_element_by_name("UserID")
-id.send_keys("*****")
+id.send_keys(dnId)
 
 # pw
 pw = driver.find_element_by_name("_word")
-pw.send_keys("*****")
+pw.send_keys(dnPw)
 
 # ログイン
 id.submit()
