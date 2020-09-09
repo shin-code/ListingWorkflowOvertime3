@@ -4,42 +4,58 @@ from selenium import webdriver
 from selenium.webdriver.support.select import Select
 from bs4 import BeautifulSoup
 import openpyxl as px
-from datetime import datetime as dt
+from datetime import datetime
+import myFn
 
 # 定数定義
 XLSX_FILE = "ListWorkflowOvertime3.xlsx"
 SHEET_NAME = "Overtime3"
 
-# 出力先ファイル存在する場合は削除
-if os.path.isfile(XLSX_FILE):
-   os.remove(XLSX_FILE)
-
-# 出力先ファイル作成
-wb = px.Workbook()
-ws = wb.active
-ws.title = SHEET_NAME  # シート名
-
-# 作成情報
-ws['A1'].value = '時間外申請一覧（システム３課）'
-ws['A2'].value = dt.now()
-
-# タイトル行
-ws['A3'].value = '申請者'
-ws['B3'].value = '申請日時'
-ws['C3'].value = '日付'
-ws['D3'].value = '氏名'
-ws['E3'].value = '実績開始時間'
-ws['F3'].value = '実績終了時間'
-ws['G3'].value = '朝のサーバーチェック'
-ws['H3'].value = '申請時間'
-ws['I3'].value = '申請深夜時間'
-
-wb.save(XLSX_FILE)  # 一旦保存
-
-# id, pw問い合わせ
+# パラメータ
 dnId = input("ログインID >> ")
 dnPw = input("パスワード >> ")
+fromDate = myFn.text_to_date(input("抽出範囲日付FROM ( yyyy/mm/dd形式 ) >> "))  # 日付変換
 
+'''
+**************************************************
+ 出力先エクセルを開く
+**************************************************
+'''
+# 出力先ファイル存在する場合はファイルを開く
+if os.path.isfile(XLSX_FILE):
+
+   wb = px.load_workbook(XLSX_FILE)
+   ws = wb.get_sheet_by_name(SHEET_NAME)
+
+
+else:  # 出力先ファイル存在しない場合はファイルを新規作成
+
+   wb = px.Workbook()
+   ws = wb.active
+   ws.title = SHEET_NAME  # シート名
+
+   # 作成情報
+   ws['A1'].value = '時間外申請一覧（システム３課）'
+
+   # タイトル行
+   ws['A2'].value = '申請者'
+   ws['B2'].value = '申請日時'
+   ws['C2'].value = '日付'
+   ws['D2'].value = '氏名'
+   ws['E2'].value = '実績開始時間'
+   ws['F2'].value = '実績終了時間'
+   ws['G2'].value = '朝のサーバーチェック'
+   ws['H2'].value = '申請時間'
+   ws['I2'].value = '申請深夜時間'
+   ws['J2'].value = '一覧作成日時'
+
+   wb.save(XLSX_FILE)  # 一旦保存
+
+'''
+**************************************************
+ desknet'sログイン → ワークフロー遷移
+**************************************************
+'''
 # chromeからdesknet'sを開く
 driver = webdriver.Chrome("./chromedriver")
 driver.get("https://dkn.e-omc.jp/cgi-bin/dneo/dneo.cgi?")
@@ -71,17 +87,33 @@ time.sleep(1)
 
 wfTblThElem = driver.find_elements_by_class_name("flow-list-line")  # 明細行elements取得
 
-wsRow = 4  # エクセル書き込み行
+'''
+**************************************************
+ ワークフロー１件ずつ処理
+**************************************************
+'''
+wsRow = ws.max_row # エクセル最終行取得
 
 # 明細行ループ
 for i in range(len(wfTblThElem)):
 
-   # 状況が"取消し"の場合、スキップ
-   wfTblThStatusElem = wfTblThElem[i].find_element_by_class_name("flow-td-status") # 状況element取得
-   wfStatus = wfTblThStatusElem.get_attribute("title")
+   wfTblTdElem = wfTblThElem[i].find_elements_by_tag_name("td")
 
-   if wfStatus == "取消し":
+   # 状況が"取消し"の場合、スキップ
+   if wfTblTdElem[3].text == "取消し":
       continue
+
+   # 作成日付を取得
+   slashCount = wfTblTdElem[6].text.count("/")  # スラッシュの出現回数
+   if slashCount == 1:  # 年が省略されているので今年を付加
+      textDate = str(datetime.now().year) + "/" + wfTblTdElem[6].text[0:5]
+   else:
+      textDate =wfTblTdElem[6].text[0:10]
+   wfMakeAplydate = myFn.text_to_date(textDate)  # 日付変換
+
+   # 作成日付が抽出範囲日付FROM以下の場合、ループを抜ける
+   if wfMakeAplydate < fromDate:
+      break
 
    # チェックボックスのidを取得
    wfTblThChkElem = wfTblThElem[i].find_elements_by_class_name("co-chk")  # チェックボックスelement取得
@@ -167,21 +199,18 @@ for i in range(len(wfTblThElem)):
    wfFpFonts = wfFormParts[19].find_elements_by_tag_name("font")
    wfOvetimeMidnight = wfFpFonts[1].text
 
-   
-   ws.cell(row=wsRow, column=1).value = wfMakeAplycant
-   ws.cell(row=wsRow, column=2).value = wfMakeAplydate
-   ws.cell(row=wsRow, column=3).value = wfDate
-   ws.cell(row=wsRow, column=4).value = wfName
-   ws.cell(row=wsRow, column=5).value = wfStartTime
-   ws.cell(row=wsRow, column=6).value = wfEndTime
-   ws.cell(row=wsRow, column=7).value = wfSvChk
-   ws.cell(row=wsRow, column=8).value = wfOvertime
-   ws.cell(row=wsRow, column=8).value = wfOvetimeMidnight
+   # エクセル出力   
+   ws.cell(row=wsRow, column=1).value = wfMakeAplycant      # 申請者
+   ws.cell(row=wsRow, column=2).value = wfMakeAplydate      # 申請日時
+   ws.cell(row=wsRow, column=3).value = wfDate              # 日付
+   ws.cell(row=wsRow, column=4).value = wfName              # 氏名
+   ws.cell(row=wsRow, column=5).value = wfStartTime         # 実績開始時間
+   ws.cell(row=wsRow, column=6).value = wfEndTime           # 実績終了時間
+   ws.cell(row=wsRow, column=7).value = wfSvChk             # 朝のサーバーチェック
+   ws.cell(row=wsRow, column=8).value = wfOvertime          # 申請時間
+   ws.cell(row=wsRow, column=9).value = wfOvetimeMidnight   # 申請深夜時間
 
    wsRow += 1  # エクセル書き込み行カウントアップ
-
-   if wsRow == 6:
-      break
 
 wb.save(XLSX_FILE)  # エクセル保存
 
