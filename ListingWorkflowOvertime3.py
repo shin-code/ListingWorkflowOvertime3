@@ -89,75 +89,76 @@ wfTblThElem = driver.find_elements_by_class_name("flow-list-line")  # 明細行e
 
 '''
 **************************************************
- ワークフロー１件ずつ処理
+ ワークフロー１件ずつ処理 → 一覧化対象idを作成
 **************************************************
 '''
-wsRow = ws.max_row # エクセル最終行取得
+listingIds = []  # 一覧化対象id
 
 # 明細行ループ
 for i in range(len(wfTblThElem)):
 
    wfTblTdElem = wfTblThElem[i].find_elements_by_tag_name("td")
 
-   # 状況が"取消し"の場合、スキップ
-   if wfTblTdElem[3].text == "取消し":
+   # 状況が"完了"以外はスキップ
+   if wfTblTdElem[3].text != "完了":
+      continue
+
+   # 表題が"時間外申請書"以外はスキップ
+   if wfTblTdElem[4].text != "時間外申請書":
       continue
 
    # 作成日付を取得
    slashCount = wfTblTdElem[6].text.count("/")  # スラッシュの出現回数
    if slashCount == 1:  # 年が省略されているので今年を付加
       textDate = str(datetime.now().year) + "/" + wfTblTdElem[6].text[0:5]
+      textTime = wfTblTdElem[6].text[6:]
    else:
-      textDate =wfTblTdElem[6].text[0:10]
+      textDate = wfTblTdElem[6].text[0:10]
+      textTime = wfTblTdElem[6].text[11:]
    wfMakeAplydate = myFn.text_to_date(textDate)  # 日付変換
 
    # 作成日付が抽出範囲日付FROM以下の場合、ループを抜ける
    if wfMakeAplydate < fromDate:
       break
 
+   # 作成日付（yyyy/mm/dd HH:MM)
+   wfMakeAplydate = wfMakeAplydate.strftime('%Y/%m/%d') + " " + textTime
+
+   # 申請者
+   wfMakeAplycant = wfTblTdElem[5].text
+   wfMakeAplycant = wfMakeAplycant[0:wfMakeAplycant.find(" ")]  # 宮崎一郎 [システム○課]のスペース前部分を抽出
+
+   # すでにエクセルに存在するかチェック
+   flgXlsExist = False
+   for j in range(1, ws.max_row+1):
+      # 申請者と申請日時で検索
+      if ws.cell(row=j, column=1).value == wfMakeAplycant \
+         and ws.cell(row=j, column=2).value == wfMakeAplydate:
+         flgXlsExist = True
+         break
+   
+   # すでにエクセルに存在した場合はスキップ
+   if flgXlsExist:
+      continue
+
    # チェックボックスのidを取得
    wfTblThChkElem = wfTblThElem[i].find_elements_by_class_name("co-chk")  # チェックボックスelement取得
    wfTblThChkInputElem = wfTblThChkElem[0].find_element_by_name("id")  # チェックボックス配下のinput取得
-   wfId = wfTblThChkInputElem.get_attribute("value")
+   listingIds.append(wfTblThChkInputElem.get_attribute("value"))
+
+'''
+**************************************************
+ 一覧化対象idを1件ずつ処理
+**************************************************
+'''
+wsRow = ws.max_row + 1  # エクセル書込行開始行（最終行取得+1）
+
+# 一覧下対象idをループ
+for i in range(len(listingIds)):
 
    # 取得したidで単票表示
-   driver.get("https://dkn.e-omc.jp/cgi-bin/dneo/zflow.cgi?cmd=flowindex#cmd=flowdisp&id=" + wfId)
+   driver.get("https://dkn.e-omc.jp/cgi-bin/dneo/zflow.cgi?cmd=flowindex#cmd=flowdisp&id=" + listingIds[i])
    time.sleep(1)
-
-   # ワークフロー種別が時間外申請以外はスキップ
-   if driver.find_element_by_class_name("jco-cab-title").text != "時間外申請書":
-      continue
-
-   """
-   作成情報
-
-   table (flow-view-meta)
-        td(flow-view-meta-title)   td(flow-view-meta-data)
-      +--------------------------+-----------------------------+
-   tr | 申請組織                  | システム○課                   |
-      +--------------------------+-----------------------------+
-   tr | 申請者                    | 宮崎  一郎                   |
-      +--------------------------+-----------------------------+
-   tr | 申請日時                  | 2020年09月01日(木) 17:00      |
-      +--------------------------+-----------------------------+
-   tr | 決済状況                  | 完了                         |
-      +--------------------------+-----------------------------+
-   """
-   wfAplyTblTdElem = driver.find_elements_by_class_name("flow-view-meta-title")  # 1列目element取得
-   
-   # 申請者と申請日時が何行目か調べる
-   for i in range(len(wfAplyTblTdElem)):
-      if wfAplyTblTdElem[i].text == "申請者":
-         wfMakeAplycantRow = i
-      elif wfAplyTblTdElem[i].text == "申請日時":
-         wfMakeAplydateRow = i
-    
-   wfAplyTblTdElem = driver.find_elements_by_class_name("flow-view-meta-data")  # 2列目element取得
-
-   # 申請者
-   wfMakeAplycant = wfAplyTblTdElem[wfMakeAplycantRow].text
-   # 申請日時
-   wfMakeAplydate = wfAplyTblTdElem[wfMakeAplydateRow].text
 
    """
    明細部分の基本的な構成
@@ -187,9 +188,9 @@ for i in range(len(wfTblThElem)):
    # 朝のサーバーチェック
    wfFpImg = wfFormParts[17].find_element_by_tag_name("img")
    if "form_checkbox_on.gif" in wfFpImg.get_attribute("src"):
-      wfSvChk = True
+      wfSvChk = 'True'
    else:
-      wfSvChk = False
+      wfSvChk = 'False'
 
    # 申告時間
    wfFpFonts = wfFormParts[18].find_elements_by_tag_name("font")
@@ -200,19 +201,20 @@ for i in range(len(wfTblThElem)):
    wfOvetimeMidnight = wfFpFonts[1].text
 
    # エクセル出力   
-   ws.cell(row=wsRow, column=1).value = wfMakeAplycant      # 申請者
-   ws.cell(row=wsRow, column=2).value = wfMakeAplydate      # 申請日時
-   ws.cell(row=wsRow, column=3).value = wfDate              # 日付
-   ws.cell(row=wsRow, column=4).value = wfName              # 氏名
-   ws.cell(row=wsRow, column=5).value = wfStartTime         # 実績開始時間
-   ws.cell(row=wsRow, column=6).value = wfEndTime           # 実績終了時間
-   ws.cell(row=wsRow, column=7).value = wfSvChk             # 朝のサーバーチェック
-   ws.cell(row=wsRow, column=8).value = wfOvertime          # 申請時間
-   ws.cell(row=wsRow, column=9).value = wfOvetimeMidnight   # 申請深夜時間
+   ws.cell(row=wsRow, column=1).value  = wfMakeAplycant      # 申請者
+   ws.cell(row=wsRow, column=2).value  = wfMakeAplydate      # 申請日時
+   ws.cell(row=wsRow, column=3).value  = wfDate              # 日付
+   ws.cell(row=wsRow, column=4).value  = wfName              # 氏名
+   ws.cell(row=wsRow, column=5).value  = wfStartTime         # 実績開始時間
+   ws.cell(row=wsRow, column=6).value  = wfEndTime           # 実績終了時間
+   ws.cell(row=wsRow, column=7).value  = wfSvChk             # 朝のサーバーチェック
+   ws.cell(row=wsRow, column=8).value  = wfOvertime          # 申請時間
+   ws.cell(row=wsRow, column=9).value  = wfOvetimeMidnight   # 申請深夜時間
+   ws.cell(row=wsRow, column=10).value = datetime.now()      # 一覧作成日時
 
    wsRow += 1  # エクセル書き込み行カウントアップ
 
 wb.save(XLSX_FILE)  # エクセル保存
 
-# driver.close()
-# driver.quit()
+driver.close()
+driver.quit()
