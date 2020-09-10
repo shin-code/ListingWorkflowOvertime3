@@ -57,7 +57,7 @@ else:  # 出力先ファイル存在しない場合はファイルを新規作�
 **************************************************
 '''
 # chromeからdesknet'sを開く
-driver = webdriver.Chrome("./chromedriver")
+driver = webdriver.Chrome("./driver/chromedriver")
 driver.get("https://dkn.e-omc.jp/cgi-bin/dneo/dneo.cgi?")
 
 # id
@@ -144,7 +144,15 @@ for i in range(len(wfTblThElem)):
    # チェックボックスのidを取得
    wfTblThChkElem = wfTblThElem[i].find_elements_by_class_name("co-chk")  # チェックボックスelement取得
    wfTblThChkInputElem = wfTblThChkElem[0].find_element_by_name("id")  # チェックボックス配下のinput取得
-   listingIds.append(wfTblThChkInputElem.get_attribute("value"))
+   wfId = wfTblThChkInputElem.get_attribute("value")
+
+   # 一覧化対象idを作成
+   listingId = {
+      'id': wfId,
+      'wfMakeAplycant' : wfMakeAplycant,
+      'wfMakeAplydate' : wfMakeAplydate,
+      }
+   listingIds.append(listingId)
 
 '''
 **************************************************
@@ -157,7 +165,7 @@ wsRow = ws.max_row + 1  # エクセル書込行開始行（最終行取得+1）
 for i in range(len(listingIds)):
 
    # 取得したidで単票表示
-   driver.get("https://dkn.e-omc.jp/cgi-bin/dneo/zflow.cgi?cmd=flowindex#cmd=flowdisp&id=" + listingIds[i])
+   driver.get("https://dkn.e-omc.jp/cgi-bin/dneo/zflow.cgi?cmd=flowindex#cmd=flowdisp&id=" + listingIds[i]['id'])
    time.sleep(1)
 
    """
@@ -201,16 +209,16 @@ for i in range(len(listingIds)):
    wfOvetimeMidnight = wfFpFonts[1].text
 
    # エクセル出力   
-   ws.cell(row=wsRow, column=1).value  = wfMakeAplycant      # 申請者
-   ws.cell(row=wsRow, column=2).value  = wfMakeAplydate      # 申請日時
-   ws.cell(row=wsRow, column=3).value  = wfDate              # 日付
-   ws.cell(row=wsRow, column=4).value  = wfName              # 氏名
-   ws.cell(row=wsRow, column=5).value  = wfStartTime         # 実績開始時間
-   ws.cell(row=wsRow, column=6).value  = wfEndTime           # 実績終了時間
-   ws.cell(row=wsRow, column=7).value  = wfSvChk             # 朝のサーバーチェック
-   ws.cell(row=wsRow, column=8).value  = wfOvertime          # 申請時間
-   ws.cell(row=wsRow, column=9).value  = wfOvetimeMidnight   # 申請深夜時間
-   ws.cell(row=wsRow, column=10).value = datetime.now()      # 一覧作成日時
+   ws.cell(row=wsRow, column=2).value  = listingIds[i]['wfMakeAplydate']  # 申請日時
+   ws.cell(row=wsRow, column=1).value  = listingIds[i]['wfMakeAplycant']  # 申請者
+   ws.cell(row=wsRow, column=3).value  = wfDate                           # 日付
+   ws.cell(row=wsRow, column=4).value  = wfName                           # 氏名
+   ws.cell(row=wsRow, column=5).value  = wfStartTime                      # 実績開始時間
+   ws.cell(row=wsRow, column=6).value  = wfEndTime                        # 実績終了時間
+   ws.cell(row=wsRow, column=7).value  = wfSvChk                          # 朝のサーバーチェック
+   ws.cell(row=wsRow, column=8).value  = wfOvertime                       # 申請時間
+   ws.cell(row=wsRow, column=9).value  = wfOvetimeMidnight                # 申請深夜時間
+   ws.cell(row=wsRow, column=10).value = datetime.now()                   # 一覧作成日時
 
    wsRow += 1  # エクセル書き込み行カウントアップ
 
