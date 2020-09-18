@@ -1,3 +1,4 @@
+import sys
 import time
 import os
 from selenium import webdriver
@@ -25,7 +26,7 @@ fromDate = myFn.text_to_date(input("抽出範囲日付FROM ( yyyy/mm/dd形式 ) 
 if os.path.isfile(XLSX_FILE):
 
    wb = px.load_workbook(XLSX_FILE)
-   ws = wb.get_sheet_by_name(SHEET_NAME)
+   ws = wb[SHEET_NAME]
 
 
 else:  # 出力先ファイル存在しない場合はファイルを新規作成
@@ -57,7 +58,15 @@ else:  # 出力先ファイル存在しない場合はファイルを新規作�
 **************************************************
 '''
 # chromeからdesknet'sを開く
-driver = webdriver.Chrome("./driver/chromedriver")
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS  # pylint: disable=no-member
+    except Exception:
+        base_path = os.path.dirname(__file__)
+    return os.path.join(base_path, relative_path)
+
+driver = webdriver.Chrome(resource_path('./chromedriver.exe'))
+
 driver.get("https://dkn.e-omc.jp/cgi-bin/dneo/dneo.cgi?")
 
 # id
