@@ -175,7 +175,7 @@ for i in range(len(listingIds)):
 
    # 取得したidで単票表示
    driver.get("https://dkn.e-omc.jp/cgi-bin/dneo/zflow.cgi?cmd=flowindex#cmd=flowdisp&id=" + listingIds[i]['id'])
-   time.sleep(1)
+   time.sleep(3)
 
    """
    明細部分の基本的な構成
